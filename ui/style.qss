@@ -1,0 +1,62 @@
+/* ==================== 简洁明亮 UI 样式表 ==================== */
+
+/* ---------- 全局设置 ---------- */
+QWidget {
+    font-family: "Microsoft YaHei", "微软雅黑", sans-serif;
+}
+
+QMainWindow, QDialog {
+    background: #f5f7fa;
+}
+
+/* ---------- 消息框 (QMessageBox) ---------- */
+QMessageBox {
+    background: white;
+    color: #2c3e50;
+}
+
+QMessageBox QLabel {
+    color: #2c3e50;
+    font-size: 14px;
+    padding: 10px;
+}
+
+QMessageBox QPushButton {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 20px;
+    min-width: 80px;
+    min-height: 35px;
+    padding: 8px 20px;
+    font-size: 13px;
+}
+
+QMessageBox QPushButton:hover {
+    background: #2980b9;
+}
+
+/* ---------- 滚动条 ---------- */
+QScrollBar:vertical {
+    background: #ecf0f1;
+    width: 8px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:vertical {
+    background: #bdc3c7;
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar:horizontal {
+    background: #ecf0f1;
+    height: 8px;
+    border-radius: 4px;
+}
+
+QScrollBar::handle:horizontal {
+    background: #bdc3c7;
+    border-radius: 4px;
+    min-width: 30px;
+}

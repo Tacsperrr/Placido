@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pyuic5 -o ui/index_ui.py ui/index.ui)"
+    ]
+  }
+}

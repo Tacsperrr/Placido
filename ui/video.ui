@@ -1,0 +1,472 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Form</class>
+ <widget class="QWidget" name="Form">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1000</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>视频检测 - 泪膜破裂检测系统</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: #f5f7fa;</string>
+  </property>
+
+  <!-- 顶部标题 -->
+  <widget class="QLabel" name="pageTitle">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>20</y>
+     <width>1000</width>
+     <height>50</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">color: #2c3e50;
+font-size: 22px;
+font-weight: bold;
+background: transparent;</string>
+   </property>
+   <property name="text">
+    <string>视频检测</string>
+   </property>
+   <property name="alignment">
+    <set>Qt::AlignCenter</set>
+   </property>
+  </widget>
+
+  <!-- 原视频区域 -->
+  <widget class="QFrame" name="originalFrame">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>90</y>
+     <width>430</width>
+     <height>380</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background: white;
+border: none;
+border-radius: 12px;</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::StyledPanel</enum>
+   </property>
+
+   <layout class="QVBoxLayout" name="originalLayout">
+    <property name="leftMargin">
+     <number>10</number>
+    </property>
+    <property name="topMargin">
+     <number>10</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+
+    <item>
+     <widget class="QLabel" name="labelTitle1">
+      <property name="maximumHeight">
+       <number>35</number>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #3498db;
+font-size: 14px;
+font-weight: bold;
+background: #ebf5fb;
+border-radius: 8px;</string>
+      </property>
+      <property name="text">
+       <string>原始视频</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QLabel" name="label">
+      <property name="styleSheet">
+       <string notr="true">background: #ecf0f1;
+border-radius: 8px;</string>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+
+  <!-- 结果视频区域 -->
+  <widget class="QFrame" name="resultFrame">
+   <property name="geometry">
+    <rect>
+     <x>520</x>
+     <y>90</y>
+     <width>430</width>
+     <height>380</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background: white;
+border: none;
+border-radius: 12px;</string>
+   </property>
+   <property name="frameShape">
+    <enum>QFrame::StyledPanel</enum>
+   </property>
+
+   <layout class="QVBoxLayout" name="resultLayout">
+    <property name="leftMargin">
+     <number>10</number>
+    </property>
+    <property name="topMargin">
+     <number>10</number>
+    </property>
+    <property name="rightMargin">
+     <number>10</number>
+    </property>
+    <property name="bottomMargin">
+     <number>10</number>
+    </property>
+
+    <item>
+     <widget class="QLabel" name="labelTitle2">
+      <property name="maximumHeight">
+       <number>35</number>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #27ae60;
+font-size: 14px;
+font-weight: bold;
+background: #e9f7ef;
+border-radius: 8px;</string>
+      </property>
+      <property name="text">
+       <string>实时分析</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QLabel" name="label_2">
+      <property name="styleSheet">
+       <string notr="true">background: #ecf0f1;
+border-radius: 8px;</string>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+
+  <!-- 进度条区域 -->
+  <widget class="QWidget" name="progressWidget">
+   <property name="geometry">
+    <rect>
+     <x>50</x>
+     <y>480</y>
+     <width>900</width>
+     <height>50</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background: transparent;</string>
+   </property>
+
+   <layout class="QVBoxLayout" name="progressLayout" spacing="2">
+    <property name="leftMargin">
+     <number>0</number>
+    </property>
+    <property name="topMargin">
+     <number>0</number>
+    </property>
+    <property name="rightMargin">
+     <number>0</number>
+    </property>
+    <property name="bottomMargin">
+     <number>0</number>
+    </property>
+
+    <!-- 进度条滑块 -->
+    <item>
+     <widget class="QSlider" name="videoSlider">
+      <property name="minimumSize">
+       <size>
+        <width>0</width>
+        <height>20</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QSlider::groove:horizontal {
+    border: none;
+    height: 8px;
+    background: #e0e0e0;
+    border-radius: 4px;
+}
+
+QSlider::handle:horizontal {
+    width: 16px;
+    margin: -4px 0;
+    background: #3498db;
+    border-radius: 8px;
+}
+
+QSlider::handle:horizontal:hover {
+    background: #2980b9;
+}</string>
+      </property>
+      <property name="minimum">
+       <number>0</number>
+      </property>
+      <property name="maximum">
+       <number>100</number>
+      </property>
+      <property name="value">
+       <number>0</number>
+      </property>
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+     </widget>
+    </item>
+
+    <!-- 时间显示 -->
+    <item>
+     <layout class="QHBoxLayout" name="timeLayout">
+      <item>
+       <widget class="QLabel" name="timeLabel">
+        <property name="styleSheet">
+         <string notr="true">color: #7f8c8d;
+font-size: 11px;</string>
+        </property>
+        <property name="text">
+         <string>00:00</string>
+        </property>
+        <property name="minimumWidth">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="timeSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QLabel" name="durationLabel">
+        <property name="styleSheet">
+         <string notr="true">color: #7f8c8d;
+font-size: 11px;</string>
+        </property>
+        <property name="text">
+         <string>00:00</string>
+        </property>
+        <property name="minimumWidth">
+         <number>60</number>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+
+  <!-- 底部按钮 -->
+  <widget class="QWidget" name="buttonFrame">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>530</y>
+     <width>1000</width>
+     <height>80</height>
+    </rect>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">background: transparent;</string>
+   </property>
+
+   <layout class="QHBoxLayout" name="buttonLayout">
+    <property name="leftMargin">
+     <number>50</number>
+    </property>
+    <property name="rightMargin">
+     <number>50</number>
+    </property>
+    <property name="spacing">
+     <number>20</number>
+    </property>
+
+    <item>
+     <widget class="QPushButton" name="pushButton">
+      <property name="minimumSize">
+       <size>
+        <width>120</width>
+        <height>45</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QPushButton {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 22px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background: #2980b9;
+}</string>
+      </property>
+      <property name="text">
+       <string>选择视频</string>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <widget class="QPushButton" name="pushButton_2">
+      <property name="minimumSize">
+       <size>
+        <width>140</width>
+        <height>45</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QPushButton {
+    background: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 22px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background: #1e8449;
+}</string>
+      </property>
+      <property name="text">
+       <string>开始/暂停</string>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <spacer name="buttonSpacer">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+
+    <!-- 状态信息标签 -->
+    <item>
+     <widget class="QLabel" name="statusLabel">
+      <property name="minimumSize">
+       <size>
+        <width>300</width>
+        <height>0</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">color: #7f8c8d;
+font-size: 12px;
+padding: 8px 15px;
+background: rgba(0,0,0,0.05);
+border-radius: 8px;</string>
+      </property>
+      <property name="text">
+       <string>点击进度条查看帧信息</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+     </widget>
+    </item>
+
+    <item>
+     <spacer name="statusSpacer">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>20</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+
+    <item>
+     <widget class="QPushButton" name="pushButton_3">
+      <property name="minimumSize">
+       <size>
+        <width>100</width>
+        <height>45</height>
+       </size>
+      </property>
+      <property name="styleSheet">
+       <string notr="true">QPushButton {
+    background: #bdc3c7;
+    color: #2c3e50;
+    border: none;
+    border-radius: 22px;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+QPushButton:hover {
+    background: #aab7b8;
+}</string>
+      </property>
+      <property name="text">
+       <string>返回</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
