@@ -385,6 +385,8 @@ class VideoProcessor:
             gray = frame
 
         center, vis_img, mask, has_break, distortion = self.detector.detect(frame)
+        # ========== 修复：删除取反操作 ==========
+        # 原代码：has_break = not has_break  (已删除)
 
         # 计算RMS和方差
         max_radius = self.detector.max_roi
@@ -419,6 +421,7 @@ class VideoProcessor:
             'rms': rms,
             'variance': variance,
             'distortion': distortion,
+            'vis_img': vis_img,      # 添加可视化图像，方便UI直接显示
             'time': current_time
         }
 
