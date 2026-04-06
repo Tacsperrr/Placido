@@ -12,9 +12,18 @@ from PyQt5.QtWidgets import *
 import cv2
 from PyQt5.QtCore import QTimer, Qt
 import sys
+import os
+# 确保根目录和ui目录都在路径中
+_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_ui_dir = os.path.dirname(os.path.abspath(__file__))
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+if _ui_dir not in sys.path:
+    sys.path.insert(0, _ui_dir)
+
 import index_ui
-import ui.photo_ui as photo_ui
-import ui.video_ui as video_ui
+import photo_ui
+import video_ui
 import src.csy_rc
 import detect
 import video_detector
