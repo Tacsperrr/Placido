@@ -464,12 +464,10 @@ class UI_video(QMainWindow):
         left_widget.setStyleSheet("background: white; border-radius: 12px;")
         left_layout.setContentsMargins(20, 20, 20, 20)
         title_label = QLabel("检测结果")
-        # 调大标题字体
-        title_label.setStyleSheet("color: #2c3e50; font-size: 24px; font-weight: bold;")
+        title_label.setStyleSheet("color: #2c3e50; font-size: 18px; font-weight: bold;")
         left_layout.addWidget(title_label)
         result_label = QLabel(result_text)
-        # 调大结果字体，增加行高
-        result_label.setStyleSheet("color: #34495e; font-size: 16px; line-height: 1.5;")
+        result_label.setStyleSheet("color: #34495e; font-size: 13px;")
         result_label.setWordWrap(True)
         left_layout.addWidget(result_label)
         left_layout.addStretch()
@@ -479,8 +477,7 @@ class UI_video(QMainWindow):
         right_widget.setStyleSheet("background: white; border-radius: 12px;")
         right_layout.setContentsMargins(20, 20, 20, 20)
         curve_title = QLabel("扭曲值变化曲线")
-        # 调大曲线标题字体
-        curve_title.setStyleSheet("color: #2c3e50; font-size: 20px; font-weight: bold;")
+        curve_title.setStyleSheet("color: #2c3e50; font-size: 18px; font-weight: bold;")
         curve_title.setAlignment(Qt.AlignCenter)
         right_layout.addWidget(curve_title)
 
@@ -503,14 +500,13 @@ class UI_video(QMainWindow):
         button_layout.addStretch()
         close_btn = QPushButton("关闭")
         close_btn.setMinimumSize(100, 40)
-        # 调大按钮字体
         close_btn.setStyleSheet("""
             QPushButton {
                 background: #3498db;
                 color: white;
                 border: none;
                 border-radius: 20px;
-                font-size: 16px;
+                font-size: 14px;
                 font-weight: bold;
             }
             QPushButton:hover {
