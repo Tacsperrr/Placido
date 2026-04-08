@@ -59,7 +59,7 @@ def debug_breaks_354(raw_grey_roi, center, layers, breaks):
     if not table_data:
         table_data = [["No breaks", "-", "-", "-"]]
 
-    # 创建表格
+    # 创建表格（关键修改：添加bbox参数控制表格位置）
     table = ax_table.table(
         cellText=table_data,
         colLabels=col_labels,
@@ -70,12 +70,13 @@ def debug_breaks_354(raw_grey_roi, center, layers, breaks):
         bbox=[0, 0.3, 1, 0.6]  # [x0, y0, width, height] 控制表格在子图中的位置
     )
 
-    # 计算标题位置
+    # 计算标题位置（精确到像素）
     dpi = fig.dpi
-    title_offset_px = 20
-    title_offset_rel = title_offset_px / (fig.get_size_inches()[1] * dpi * 0.6)
+    title_offset_px = 20  # 10像素间距
+    # 将像素转换为相对坐标（考虑表格高度）
+    title_offset_rel = title_offset_px / (fig.get_size_inches()[1] * dpi * 0.6)  # 0.6是表格高度占比
 
-    # 添加标题
+    # 添加标题（精确控制位置）
     table_title = ax_table.text(
         0.5,  # 水平居中
         0.3 + 0.6 + title_offset_rel,  # 表格顶部y位置 + 表格高度 + 偏移
@@ -89,10 +90,11 @@ def debug_breaks_354(raw_grey_roi, center, layers, breaks):
     # 表格样式调整
     table.auto_set_font_size(False)
     table.set_fontsize(18)
-    table.scale(1.2, 1.5)
+    table.scale(1.2, 1.5)  # 减少垂直缩放
 
     # 单元格样式
     for key, cell in table.get_celld().items():
+        # cell.set_height(0.1)  # 增加行高使单行表格更明显
         if key[0] == 0:  # 标题行
             cell.set_facecolor('#f0f0f0')
             cell.set_text_props(weight='bold')
@@ -113,7 +115,7 @@ def debug_breaks_352(roi_img, center, every_width):
     ax1.axis('off')
     plt.title("315°-330° in ROI", fontsize=14)
 
-    # 绘制扇形边界
+    # 绘制扇形边界（两条射线 + 圆弧连接）
     for angle in [angle_start, angle_end]:
         rad = np.deg2rad(angle)
         x = int(half + half * np.cos(rad))
@@ -126,7 +128,7 @@ def debug_breaks_352(roi_img, center, every_width):
     arc_y = half + half * np.sin(np.deg2rad(arc_angles))
     ax1.plot(arc_x, arc_y, color='lime', linewidth=1)
 
-    # 2. 构建315~330度环层信息表格
+    # 2. 构建300~315度环层信息表格
     angle_range = range(315, 330)
     max_layers = 7
     columns = ["Angle"] + [f"Layer {i + 1}" for i in range(max_layers)]
@@ -155,7 +157,7 @@ def debug_breaks_352(roi_img, center, every_width):
 
     # 设置轴样式
     ax.set_xticklabels(columns, rotation=45, ha='right')
-    ax.set_yticks([])
+    ax.set_yticks([])  # 删除多余的y轴刻度
 
     # 强制画最右边和底边框线
     for spine in ax.spines.values():
@@ -183,7 +185,7 @@ def debug_polar_layers(roi_img, center, radius_pairs):
     cropped = roi_img[y1:y2, x1:x2].copy()
 
     # 3. 绘制圆
-    offset_center = (x_c - x1, y_c - y1)
+    offset_center = (x_c - x1, y_c - y1)  # 防止超出边界情况
     for (r_min, r_max) in radius_pairs:
         cv2.circle(cropped, offset_center, r_min, color, 1)
         cv2.circle(cropped, offset_center, r_max, color, 1)
@@ -197,21 +199,24 @@ def debug_polar_layers(roi_img, center, radius_pairs):
 
 
 def debug_visualize_horizontal(img, derivative, layers):
-    plt.figure(figsize=(15, 6))
+    plt.figure(figsize=(15, 6))  # 调整画布大小
 
-    # 1. 导数信号分析 + 标记关键点坐标
+    # 1. 导数信号分析 + 标记关键点坐标（不画垂直线）
     plt.subplot(121)
     plt.plot(derivative)
     for start, end in layers:
+        # 标记 start 点（红色点 + 坐标文字）
         plt.scatter(start, derivative[start], color='red', s=30, zorder=5)
         plt.text(start, derivative[start], f'x={start}',
                  color='black', fontsize=12, ha='left', va='bottom')
+
+        # 标记 end 点（绿色点 + 坐标文字）
         plt.scatter(end, derivative[end], color='green', s=30, zorder=5)
         plt.text(end, derivative[end], f'x={end}',
                  color='black', fontsize=12, ha='left', va='bottom')
     plt.title("Derivative with Key Points")
 
-    # 2. 原始图像 + 垂直线标注
+    # 2. 原始图像 + 垂直线标注（保持原样）
     plt.subplot(122)
     plt.imshow(img, cmap='gray')
     for start, end in layers:
@@ -223,13 +228,25 @@ def debug_visualize_horizontal(img, derivative, layers):
     plt.show()
 
 
+
+
 def essay_image( original_img, binary_img):
     # 创建画布
-    fig = plt.figure(figsize=(16, 7), dpi=150)
+    fig = plt.figure(figsize=(16, 7), dpi=150)  # 总画布尺寸（英寸）
 
     # 转换原始图像颜色空间
     original_rgb = cv2.cvtColor(original_img, cv2.COLOR_BGR2RGB)
     binary_img = cv2.cvtColor(binary_img, cv2.COLOR_BGR2RGB)
+
+    # # 调整图像显示尺寸
+    # def resize_to_display(img, target_size=(800, 600)):
+    #     h, w = img.shape[:2]
+    #     scale = min(target_size[0] / w, target_size[1] / h)
+    #     return cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_NEAREST)
+    #
+    # # 调整图像尺寸
+    # resized_original = resize_to_display(original_rgb)
+    # resized_binary = resize_to_display(binary_img)
 
     # 创建子图
     ax1 = fig.add_subplot(1, 2, 1)
@@ -273,10 +290,10 @@ def debug_layers_der(polar,derivative,horizontal_proj,proj_smoothed):
     plt.xlabel('Column Index')
     plt.ylabel('Intensity')
 
-    # 4. 导数曲线
+    # 4. 导数曲线（仅保留y=0参考线）
     plt.subplot(2, 2, 4)
     plt.plot(derivative, 'g-', label='Derivative')
-    plt.axhline(y=0, color='k', linestyle='--', linewidth=0.8)
+    plt.axhline(y=0, color='k', linestyle='--', linewidth=0.8)  # 添加y=0参考线
     plt.title('Projection Derivative')
     plt.xlabel('Column Index')
     plt.ylabel('Derivative Value')
@@ -286,49 +303,41 @@ def debug_layers_der(polar,derivative,horizontal_proj,proj_smoothed):
 
 
 def visualize_analysis(roi, center, breaks, layers):
-    """
-    可视化分析结果 - 破裂区域填充浅蓝色，正常环线为绿色
-    :param roi: RGB 图像 (H,W,3)
-    :param center: 中心点 (x,y)
-    :param breaks: 破裂区域列表 [(layer_idx, [(start_angle, end_angle), ...]), ...]
-    :param layers: 环层列表 [(r_min, r_max), ...]
-    :return: 标注后的 RGB 图像
-    """
-    # 确保输入为 RGB，复制一份避免修改原图
-    vis = roi.copy()
-
-    # 只给破裂区域涂色（浅蓝色，在 RGB 中为 (200,255,255)）
+    vis = cv2.addWeighted(roi, 0.75, np.zeros_like(roi), 0.25, 0)
+    for r_min, r_max in layers:
+        cv2.circle(vis, center, r_max, (0, 255, 0), 1)  # 外圆绿色细线
     for layer_idx, angle_ranges in breaks:
-        if 0 < layer_idx < len(layers):
-            prev_r_max = layers[layer_idx - 1][1]
-            curr_r_max = layers[layer_idx][1]
-
-            for start_angle, end_angle in angle_ranges:
-                # 生成扇形多边形
+        for start, end in angle_ranges:
+            if layer_idx > 0:
+                prev_r_max = layers[layer_idx - 1][1]
+                curr_r_max = layers[layer_idx][1]
+                # 起点终点
+                pt1_inner = (int(center[0] + prev_r_max * np.cos(np.deg2rad(start))),
+                             int(center[1] + prev_r_max * np.sin(np.deg2rad(start))))
+                pt2_inner = (int(center[0] + prev_r_max * np.cos(np.deg2rad(end))),
+                             int(center[1] + prev_r_max * np.sin(np.deg2rad(end))))
+                pt1_outer = (int(center[0] + curr_r_max * np.cos(np.deg2rad(start))),
+                             int(center[1] + curr_r_max * np.sin(np.deg2rad(start))))
+                pt2_outer = (int(center[0] + curr_r_max * np.cos(np.deg2rad(end))),
+                             int(center[1] + curr_r_max * np.sin(np.deg2rad(end))))
+                cv2.line(vis, pt1_inner, pt1_outer, (0, 165, 255), 1, lineType=cv2.LINE_AA)
+                cv2.line(vis, pt2_inner, pt2_outer, (255, 165, 255), 1, lineType=cv2.LINE_AA)
+                overlay = vis.copy() # 构建并绘制填充区域
                 num_arc_points = 50
-                # 外弧
-                angles_outer = np.linspace(start_angle, end_angle, num_arc_points)
-                pts_outer = [
+                arc_outer = [
                     (int(center[0] + curr_r_max * np.cos(np.deg2rad(a))),
                      int(center[1] + curr_r_max * np.sin(np.deg2rad(a))))
-                    for a in angles_outer
-                ]
-                # 内弧（反向）
-                angles_inner = np.linspace(end_angle, start_angle, num_arc_points)
-                pts_inner = [
+                    for a in np.linspace(start, end, num_arc_points)
+                ] # 外圆弧
+                arc_inner = [
                     (int(center[0] + prev_r_max * np.cos(np.deg2rad(a))),
                      int(center[1] + prev_r_max * np.sin(np.deg2rad(a))))
-                    for a in angles_inner
-                ]
-                polygon = np.array(pts_outer + pts_inner, dtype=np.int32)
-                # 填充浅蓝色（RGB: (200,255,255)）
-                cv2.fillPoly(vis, [polygon], (200, 255, 255))
+                    for a in np.linspace(end, start, num_arc_points)
+                ] # 内圆弧
+                polygon = [pt1_outer] + arc_outer + [pt2_outer, pt2_inner] + arc_inner + [pt1_inner] # 封闭区域点构造
+                pts = np.array(polygon, dtype=np.int32)
+                cv2.fillPoly(overlay, [pts], (255, 255, 200)) # 填充
+                cv2.addWeighted(overlay, 0.8, vis, 0.2, 0, vis)
 
-    # 画绿色环（只画线，不填充）
-    for r_min, r_max in layers:
-        cv2.circle(vis, center, r_max, (0, 255, 0), 1)
-
-    # 画中心点
-    cv2.drawMarker(vis, center, (0, 0, 255), cv2.MARKER_CROSS, 20, 2)
-
+    cv2.drawMarker(vis, center, (0, 0, 255), cv2.MARKER_CROSS, 20, 2)  # 标记中心点
     return vis
