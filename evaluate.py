@@ -187,3 +187,49 @@ if __name__ == "__main__":
 
     # 打印评估报告
     evaluator.print_report()
+
+#只测阳性样本
+# if __name__ == "__main__":
+#     detector = detect.PlacidoDetector()
+#     evaluator = EnhancedEvaluator(detector)
+#
+#     # ================= 自己写：只测试阳性样本 =================
+#     pos_dir = "./data/2"  # 你的阳性路径
+#
+#     # 只遍历阳性图片
+#     for f in os.listdir(pos_dir):
+#         img_path = os.path.join(pos_dir, f)
+#         if img_path.lower().endswith(('jpg','png','jpeg','bmp')):
+#             res = evaluator.evaluate_image(img_path, expected_break=True)
+#             if res:
+#                 evaluator._record_result(res, 'positive')
+#
+#     # 计算指标
+#     evaluator._calculate_metrics()
+#     # =========================================================
+#
+#     evaluator.print_report()
+
+# 只测阴性样本
+# if __name__ == "__main__":
+#     detector = detect.PlacidoDetector()
+#     evaluator = EnhancedEvaluator(detector)
+#
+#     # ================= 只测试阴性样本 =================
+#     neg_dir = "./data/1"  # 你的阴性文件夹（无裂纹）
+#
+#     # 只遍历阴性图片
+#     for f in os.listdir(neg_dir):
+#         img_path = os.path.join(neg_dir, f)
+#         if img_path.lower().endswith(('jpg','png','jpeg','bmp')):
+#             # 关键：False = 预期没有裂纹
+#             res = evaluator.evaluate_image(img_path, expected_break=False)
+#             if res:
+#                 # 关键：negative = 阴性样本
+#                 evaluator._record_result(res, 'negative')
+#
+#     # 计算指标
+#     evaluator._calculate_metrics()
+#     # ==================================================
+#
+#     evaluator.print_report()
