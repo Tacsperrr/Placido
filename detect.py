@@ -243,7 +243,7 @@ class PlacidoDetector:
         """
         加权投票机制判断是否破裂
         :param angle_scores: list of (angle, fused_score)
-        :return: list of break ranges [(start_angle, end_angle), ...]
+        :return: list of break ranges [(start_angle, end_angle), ...]  # 标准化为不跨越0°
         """
         if not angle_scores:
             return []
@@ -253,11 +253,11 @@ class PlacidoDetector:
         scores = np.array([s for _, s in angle_scores])
         angles = np.array([a for a, _ in angle_scores])
 
-        # 使用双阈值判断（恢复原逻辑，包含uncertain角度）
+        # 使用双阈值判断
         is_abnormal = scores < self.supplement_threshold
         is_uncertain = (scores >= self.supplement_threshold) & (scores < self.filter_threshold)
 
-        # 恢复：合并abnormal + uncertain角度，避免漏判/误判
+        # 合并abnormal + uncertain角度
         abnormal_angles = set(angles[is_abnormal])
         uncertain_angles = set(angles[is_uncertain])
         all_abnormal = sorted(abnormal_angles | uncertain_angles)
@@ -272,7 +272,7 @@ class PlacidoDetector:
             end = start
             j = i + 1
 
-            # 合并间隔恢复为≤5度，平衡连续判定
+            # 合并间隔≤5度
             while j < len(all_abnormal):
                 if all_abnormal[j] - end <= 5:
                     end = all_abnormal[j]
@@ -281,13 +281,22 @@ class PlacidoDetector:
                 j += 1
 
             span = (end - start + 1) % num_angles
-            # 最小破裂跨度从6改回4，减少误判
+            # 最小破裂跨度从6改回4
             if span >= 2:
                 breaks.append([start, end])
 
             i = j
 
-        return breaks
+        # ========== 修复：处理跨越0°的破裂区域 ==========
+        normalized_breaks = []
+        for start, end in breaks:
+            if start <= end:
+                normalized_breaks.append((start, end))
+            else:
+                # 跨越0°，拆分为两段
+                normalized_breaks.append((start, 359))
+                normalized_breaks.append((0, end))
+        return normalized_breaks
 
     # ========== 性能优化：简化_find_central_region ==========
     def _find_central_region(self, image):
@@ -412,7 +421,7 @@ class PlacidoDetector:
         # ========== 修复4：环层检测时过滤过小/过大的环 ==========
         try:
             layers = self.detect_ring_layers(center, raw_gray_img, polar_cache)
-            # 过滤无效环层：半径过小(<13)或过大(>max_roi)，与detect_ring_layers统一
+            # 过滤无效环层：半径过小(<13)或过大(>max_roi)
             min_layer_radius = 13
             max_layer_radius = self.max_roi
             layers = [(r_min, r_max) for r_min, r_max in layers
@@ -440,7 +449,6 @@ class PlacidoDetector:
     # ========== 性能优化：简化detect_ring_layers ==========
     def detect_ring_layers(self, center, gray_img, polar_cache=None):
         """检测环层 - 优化版：减少计算量，添加异常处理和环层过滤"""
-        # ========== 修复2：异常处理 - 空数组检查 ==========
         if center is None:
             return []
         if gray_img is None or gray_img.size == 0:
@@ -483,9 +491,9 @@ class PlacidoDetector:
 
             filtered_layers = valid_pairs
 
-            # ========== 修复4：环层过滤 - 过滤过小/过大的环 ==========
-            min_layer_radius = 13  # 最小半径
-            max_layer_radius = self.max_roi if self.max_roi > 0 else 300  # 最大半径
+            # 环层过滤
+            min_layer_radius = 13
+            max_layer_radius = self.max_roi if self.max_roi > 0 else 300
             filtered_layers = [(r_min, r_max) for r_min, r_max in filtered_layers
                               if min_layer_radius <= r_min and r_max <= max_layer_radius]
 
@@ -498,7 +506,6 @@ class PlacidoDetector:
     # ========== 优化后的detect_breaks：多特征融合 + 性能优化 ==========
     def detect_breaks(self, roi, center, layers):
         """检测破裂 - 添加异常处理"""
-        # ========== 修复2：异常处理 ==========
         try:
             if center is None:
                 return []
@@ -519,12 +526,17 @@ class PlacidoDetector:
         if not standard_widths:
             print("警告：无有效环层宽度，跳过破损检测")
             return []
+        # ========== 修复：环层数量不足时直接返回 ==========
+        if len(standard_widths) < 2:
+            print("警告：环层数量不足2，无法检测破裂")
+            return []
+
         standard_width00 = [standard_widths[0] * 0.25, standard_widths[0] * 3.8, standard_widths[0] * 0.3]
         num_expected_layers = min(len(standard_widths) - 1, 10)
         every_width = {}
         finish_counts = {}
 
-        # ========== 修复3：三角函数缓存 ==========
+        # 三角函数缓存
         cos_sin_cache = {ad: (np.cos(np.deg2rad(ad)), np.sin(np.deg2rad(ad)))
                         for ad in range(0, num_angles, angle_step)}
 
@@ -629,7 +641,8 @@ class PlacidoDetector:
                 num_detected_bands = finish_counts.get(angle, 0)
 
                 if layer_idx >= num_detected_bands or not band_list:
-                    angle_scores.append((angle, 0.55))
+                    # ========== 修复：默认分数改为1.0（表示正常） ==========
+                    angle_scores.append((angle, 1.0))
                     continue
 
                 r_start, r_end = band_list[layer_idx]
@@ -646,7 +659,6 @@ class PlacidoDetector:
                 # 3. 边缘连续性特征 - 恢复宽松的判定区间
                 actual_width = r_end - r_start
                 width_ratio = actual_width / standard if standard > 0 else 1
-                # 恢复原宽松区间，避免过度惩罚
                 if 0.55 <= width_ratio <= 1.45:
                     edge_score = 1.0
                 elif 0.45 <= width_ratio <= 1.55:
@@ -669,7 +681,7 @@ class PlacidoDetector:
     # ========== 性能优化：简化polar_transform ==========
     def polar_transform(self, img, center, output_size=None):
         """极坐标变换 - 优化版：减少输出分辨率"""
-        max_radius = self.max_roi + 50
+        max_radius = self.max_roi  # 修复：使用 self.max_roi 而非 +50，保持一致
         if output_size is None:
             output_size = (int(max_radius), 360)
         flags = cv2.INTER_LINEAR + cv2.WARP_POLAR_LINEAR
