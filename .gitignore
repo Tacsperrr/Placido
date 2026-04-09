@@ -1,0 +1,26 @@
+# 忽略整个数据集文件夹（核心！数据集不会再被Git控制）
+data/
+.claude/
+temp/
+
+# Python 编译缓存（必加，避免无用文件提交）
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 临时文件/日志文件
+*.log
+*.tmp
+*.temp
+
+# IDE 配置文件（可选，避免PyCharm配置提交）
+.idea/
+
+
+# 视频/图片等大文件（如果数据集不是放data，而是零散视频/图片，加这个）
+*.avi
+*.mp4
+*.png
+*.jpg
+*.jpeg
