@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(pyuic5 -o ui/index_ui.py ui/index.ui)",
-      "Bash(D:HPsoftwareAnacondaenvspy39-opencvpython.exe -m PyQt5.uic.pyuic index.ui -o index_ui.py)"
-    ]
-  }
-}
