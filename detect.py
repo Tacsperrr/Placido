@@ -26,7 +26,7 @@ def cv2_imread_chinese(path):
 
 class PlacidoDetector:
     def __init__(self):
-        self.gray_threshold = 35  # 灰度阈值
+        self.gray_threshold = 45  # 灰度阈值
         self.max_roi = 400
         self.morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         # ========== 多特征融合加权投票机制 ==========
@@ -48,11 +48,30 @@ class PlacidoDetector:
 
     def _enhance_contrast(self, image):
         """增强中心区域对比度"""
-        gamma = 0.7
-        inv_gamma = 1.0 / gamma
-        table = np.array([((i / 255.0) ** inv_gamma) * 255
-                          for i in np.arange(0, 256)]).astype("uint8")
-        return cv2.LUT(image, table)
+        print(f"Input image shape: {image.shape}")  # 输出输入图像的形状
+
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            # Gamma校正
+            gamma = 0.7
+            inv_gamma = 1.0 / gamma
+            table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in range(256)], dtype="uint8")
+            gamma_corrected = cv2.LUT(image, table)
+
+            # 转换为灰度
+            gray = cv2.cvtColor(gamma_corrected, cv2.COLOR_BGR2GRAY)
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(gray)
+
+            enhanced_bgr = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
+            return enhanced_bgr
+
+        # 如果输入图像是单通道灰度图像，直接进行CLAHE
+        elif len(image.shape) == 2:
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+            enhanced = clahe.apply(image)
+            return enhanced
+        else:
+            raise ValueError("输入的图像格式不正确")
 
     # ========== 性能优化：简化adaptive_enhancement ==========
     def adaptive_enhancement(self, gray_img):
@@ -301,25 +320,28 @@ class PlacidoDetector:
     # ========== 性能优化：简化_find_central_region ==========
     def _find_central_region(self, image):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        binary_pre = cv2.adaptiveThreshold(
-            gray, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV, 31, 3
-        )
-        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        stage1 = cv2.morphologyEx(binary_pre, cv2.MORPH_OPEN, kernel_open, iterations=1)
-        kernel_ellipse = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        cleaned_pre = cv2.morphologyEx(stage1, cv2.MORPH_CLOSE, kernel_ellipse)
+
+        # 使用合适的自适应阈值
+        binary_pre = cv2.adaptiveThreshold(gray, 255,
+                                           cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                           cv2.THRESH_BINARY_INV, 51, 5)
+
+        # 调整开闭运算的结构元素
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+
+        stage1 = cv2.morphologyEx(binary_pre, cv2.MORPH_OPEN, kernel_open, iterations=2)
+        cleaned_pre = cv2.morphologyEx(stage1, cv2.MORPH_CLOSE, kernel_close)
 
         contours, _ = cv2.findContours(cleaned_pre, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         valid_contours = []
+
         for cnt in contours:
             x, y, w, h = cv2.boundingRect(cnt)
-            if w == 0 or h == 0:
-                continue
-            aspect_ratio = max(w / h, h / w)
-            if aspect_ratio <= 1.8:
-                valid_contours.append(cnt)
+            if w > 0 and h > 0:
+                aspect_ratio = max(w / h, h / w)
+                if aspect_ratio <= 2.0:  # 放宽比例
+                    valid_contours.append(cnt)
 
         if valid_contours:
             max_contour = max(valid_contours, key=cv2.contourArea)
@@ -328,6 +350,7 @@ class PlacidoDetector:
         else:
             roi = gray
 
+        # 调用对比度增强
         enhanced = self._enhance_contrast(roi)
         binary = cv2.threshold(enhanced, self.gray_threshold, 255, cv2.THRESH_BINARY_INV)[1]
         cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, self.morph_kernel, iterations=2)
@@ -340,21 +363,24 @@ class PlacidoDetector:
         return cleaned
 
     def _score_contour(self, cnt, img_center):
-        """轮廓评分（选最优轮廓）"""
         area = cv2.contourArea(cnt)
         perimeter = cv2.arcLength(cnt, True)
+
         circularity = 4 * np.pi * area / (perimeter ** 2) if perimeter > 0 else 0
         (x, y), radius = cv2.minEnclosingCircle(cnt)
         diameter = 2 * radius
+
         if diameter <= 10:
             return 0
+
         cnt_center = np.array([x, y])
         position_score = 1 - (np.linalg.norm(cnt_center - img_center) / np.linalg.norm(img_center))
-        x, y, w, h = cv2.boundingRect(cnt)
-        aspect_ratio = w / h if h != 0 else 0
-        aspect_score = 1 - abs(aspect_ratio - 1.0)
-        return (circularity * 0.6 + aspect_score * 0.2 + position_score * 0.2)
 
+        aspect_ratio = [cv2.boundingRect(cnt)[2] / cv2.boundingRect(cnt)[3] for cnt in cnt]
+        aspect_score = 1 - abs(np.mean(aspect_ratio) - 1.0)
+
+        area_score = area / (img_center[0] * img_center[1])  # 归一化面积评分
+        return (circularity * 0.5 + aspect_score * 0.3 + position_score * 0.2 + area_score * 0.1)
     def generate_terrain_map(self, img1, x_c, y_c):
         """生成地形图"""
         h, w = img1.shape[:2]
