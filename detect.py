@@ -26,7 +26,7 @@ def cv2_imread_chinese(path):
 
 class PlacidoDetector:
     def __init__(self):
-        self.gray_threshold = 45  # 灰度阈值
+        self.gray_threshold = 47  # 灰度阈值
         self.max_roi = 400
         self.morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         # ========== 多特征融合加权投票机制 ==========
@@ -327,7 +327,7 @@ class PlacidoDetector:
                                            cv2.THRESH_BINARY_INV, 51, 5)
 
         # 调整开闭运算的结构元素
-        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+        kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
 
         stage1 = cv2.morphologyEx(binary_pre, cv2.MORPH_OPEN, kernel_open, iterations=2)
