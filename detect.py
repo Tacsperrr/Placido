@@ -10,11 +10,6 @@ import visual
 
 
 def cv2_imread_chinese(path):
-    """
-    读取图片，解决OpenCV对中文路径的支持问题
-    :param path: 图片路径（可含中文）
-    :return: 图片数组（None=读取失败）
-    """
     try:
         stream = np.fromfile(path, dtype=np.uint8)
         image = cv2.imdecode(stream, cv2.IMREAD_COLOR)
@@ -26,46 +21,35 @@ def cv2_imread_chinese(path):
 
 class PlacidoDetector:
     def __init__(self):
-        self.gray_threshold = 47  # 灰度阈值
+        self.gray_threshold = 47
         self.max_roi = 400
         self.morph_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        # ========== 多特征融合加权投票机制 ==========
-        # 恢复均衡的特征权重（宽度核心，灰度辅助）
         self.feature_weights = {
-            'width': 0.55,  # 恢复核心权重，避免灰度过度干扰
-            'gray_uniformity': 0.30,  # 降回原权重，减少噪声敏感
-            'edge_continuity': 0.15  # 边缘连续性
+            'width': 0.55,
+            'gray_uniformity': 0.30,
+            'edge_continuity': 0.15
         }
-        # 双阈值设计（平衡版）- 放宽阈值，避免过度过滤
-        self.filter_threshold = 0.56  # 从0.60降回0.52，减少误判
-        self.supplement_threshold = 0.35  # 从0.45降回0.38，平衡漏检
-        # 破裂判定参数（恢复合理值）
-        self.break_angle_threshold = 2  # 连续异常角度阈值
-        self.break_span_min = 4  # 最小破裂跨度，从6改回4
-        # 性能优化参数
-        self.angle_step = 2  # 角度步进
-        self.use_vectorized = True  # 向量化计算开关
+        self.filter_threshold = 0.56
+        self.supplement_threshold = 0.35
+        self.break_angle_threshold = 2
+        self.break_span_min = 4
+        self.angle_step = 2
+        self.use_vectorized = True
 
     def _enhance_contrast(self, image):
-        """增强中心区域对比度"""
-        print(f"Input image shape: {image.shape}")  # 输出输入图像的形状
+        print(f"Input image shape: {image.shape}")
 
         if len(image.shape) == 3 and image.shape[2] == 3:
-            # Gamma校正
             gamma = 0.7
             inv_gamma = 1.0 / gamma
             table = np.array([((i / 255.0) ** inv_gamma) * 255 for i in range(256)], dtype="uint8")
             gamma_corrected = cv2.LUT(image, table)
-
-            # 转换为灰度
             gray = cv2.cvtColor(gamma_corrected, cv2.COLOR_BGR2GRAY)
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             enhanced = clahe.apply(gray)
-
             enhanced_bgr = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
             return enhanced_bgr
 
-        # 如果输入图像是单通道灰度图像，直接进行CLAHE
         elif len(image.shape) == 2:
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             enhanced = clahe.apply(image)
@@ -73,9 +57,7 @@ class PlacidoDetector:
         else:
             raise ValueError("输入的图像格式不正确")
 
-    # ========== 性能优化：简化adaptive_enhancement ==========
     def adaptive_enhancement(self, gray_img):
-        """自适应图像增强管道 - 优化版"""
         clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(16, 16))
         enhanced = clahe.apply(gray_img)
 
@@ -91,7 +73,6 @@ class PlacidoDetector:
         filtered = cv2.medianBlur(enhanced, filter_size)
         return filtered
 
-    # ========== 多特征融合：宽度特征计算（核心）==========
     def _calculate_width_feature(self, r_start, r_end, standard_width):
         if standard_width <= 0:
             return 0.0
@@ -106,9 +87,7 @@ class PlacidoDetector:
             score *= 0.7
         return np.clip(score, 0, 1)
 
-    # ========== 多特征融合：灰度均匀度特征（增强）==========
     def _calculate_gray_uniformity_feature(self, roi, center, angle_deg, r_start, r_end):
-        """计算灰度均匀度特征 - 破裂区域灰度变化更剧烈"""
         angle = np.deg2rad(angle_deg)
         gray_vals = []
         step = max(1, int((r_end - r_start) / 15))
@@ -123,16 +102,13 @@ class PlacidoDetector:
         gray_arr = np.array(gray_vals, dtype=np.float32)
         mean_val = np.mean(gray_arr)
         if mean_val > 0:
-            cv = np.std(gray_arr) / mean_val  # 变异系数
+            cv = np.std(gray_arr) / mean_val
         else:
             cv = 0
-        # 平衡灰度敏感度
         uniformity_score = np.clip(1 - cv * 1.3, 0, 1)
         return uniformity_score
 
-    # ========== 多特征融合：边缘连续性特征（增强）==========
     def _calculate_edge_continuity_feature(self, derivative, inner_idx, outer_idx):
-        """计算边缘连续性特征 - 破裂区域边缘不连续"""
         if len(inner_idx) == 0 or len(outer_idx) == 0:
             return 0.0
 
@@ -153,12 +129,7 @@ class PlacidoDetector:
         continuity_score = (inner_continuity * 0.6 + outer_continuity * 0.3 + density_score * 0.1)
         return np.clip(continuity_score, 0, 1)
 
-    # ========== 多特征融合：加权投票机制 ==========
     def _fused_break_score(self, width_score, gray_score, edge_score):
-        """
-        多特征融合加权投票
-        返回综合得分：0-1之间，低于阈值判定为破裂
-        """
         weights = self.feature_weights
         fused_score = (
             weights['width'] * width_score +
@@ -167,17 +138,7 @@ class PlacidoDetector:
         )
         return fused_score
 
-    # ========== 新增：扭曲值(Distortion)计算 ==========
     def calculate_distortion(self, roi, center, layers):
-        """
-        计算泪膜扭曲值 - 基于普拉多环的不规则程度
-        扭曲值越大，表示泪膜越不稳定
-
-        :param roi: 灰度图像
-        :param center: 中心点 (x, y)
-        :param layers: 环层信息 [(r_min, r_max), ...]
-        :return: distortion_value (float): 扭曲值，0表示无扭曲
-        """
         if not layers or len(layers) == 0:
             return 0.0
 
@@ -185,7 +146,6 @@ class PlacidoDetector:
         angle_step = self.angle_step
         num_angles = 360
 
-        # 存储每个角度的环层半径
         inner_radii = []
         outer_radii = []
 
@@ -196,7 +156,6 @@ class PlacidoDetector:
             cos_a, sin_a = cos_sin_cache[angle_deg]
             profile_intensity = []
 
-            # 采样获取径向强度分布
             for r in range(0, max_radius, 2):
                 x = int(center[0] + r * cos_a)
                 y = int(center[1] + r * sin_a)
@@ -213,20 +172,16 @@ class PlacidoDetector:
             intensity_smooth = cv2.GaussianBlur(intensity.reshape(1, -1), (kernel_size, 1), 2).flatten()
             derivative = np.gradient(intensity_smooth)
 
-            # 找峰值和谷值（内外边缘）
             peaks, _ = find_peaks(derivative, distance=8, prominence=0.8, width=3)
             valleys, _ = find_peaks(-derivative, distance=8, prominence=0.8, width=3)
 
-            # 筛选有效的峰值和谷值
             valid_peaks = [p for p in peaks if derivative[p] > 0.6]
             valid_valleys = [v for v in valleys if derivative[v] < -0.6]
 
             if valid_peaks and valid_valleys:
-                # 取最内层和最外层
-                inner_r = min(valid_peaks) * 2  # 乘2是因为采样步长为2
+                inner_r = min(valid_peaks) * 2
                 outer_r = max(valid_valleys) * 2
 
-                # 过滤异常值
                 if 20 < inner_r < max_radius and 20 < outer_r < max_radius:
                     inner_radii.append(inner_r)
                     outer_radii.append(outer_r)
@@ -234,36 +189,24 @@ class PlacidoDetector:
         if len(inner_radii) < 10 or len(outer_radii) < 10:
             return 0.0
 
-        # 计算扭曲值：基于半径的标准差
         inner_radii = np.array(inner_radii)
         outer_radii = np.array(outer_radii)
 
-        # 计算每个环层半径的标准差
         inner_std = np.std(inner_radii)
         outer_std = np.std(outer_radii)
 
-        # 计算每个环层半径与平均值的偏差百分比
         inner_mean = np.mean(inner_radii)
         outer_mean = np.mean(outer_radii)
 
-        inner_cv = inner_std / inner_mean if inner_mean > 0 else 0  # 变异系数
+        inner_cv = inner_std / inner_mean if inner_mean > 0 else 0
         outer_cv = outer_std / outer_mean if outer_mean > 0 else 0
 
-        # 综合扭曲值（归一化到0-1）
-        # 论文中扭曲值随时间增加，这里用环的不规则程度作为扭曲指标
         distortion_value = (inner_cv + outer_cv) / 2
-
-        # 归一化：假设正常扭曲值在0.05以内，超过0.2表示严重扭曲
         distortion_normalized = min(distortion_value / 0.2, 1.0)
 
         return float(distortion_normalized)
 
     def _vote_break_judgment(self, angle_scores):
-        """
-        加权投票机制判断是否破裂
-        :param angle_scores: list of (angle, fused_score)
-        :return: list of break ranges [(start_angle, end_angle), ...]  # 标准化为不跨越0°
-        """
         if not angle_scores:
             return []
 
@@ -272,11 +215,9 @@ class PlacidoDetector:
         scores = np.array([s for _, s in angle_scores])
         angles = np.array([a for a, _ in angle_scores])
 
-        # 使用双阈值判断
         is_abnormal = scores < self.supplement_threshold
         is_uncertain = (scores >= self.supplement_threshold) & (scores < self.filter_threshold)
 
-        # 合并abnormal + uncertain角度
         abnormal_angles = set(angles[is_abnormal])
         uncertain_angles = set(angles[is_uncertain])
         all_abnormal = sorted(abnormal_angles | uncertain_angles)
@@ -284,14 +225,12 @@ class PlacidoDetector:
         if not all_abnormal:
             return []
 
-        # 找连续异常区域
         i = 0
         while i < len(all_abnormal):
             start = all_abnormal[i]
             end = start
             j = i + 1
 
-            # 合并间隔≤5度
             while j < len(all_abnormal):
                 if all_abnormal[j] - end <= 5:
                     end = all_abnormal[j]
@@ -300,37 +239,38 @@ class PlacidoDetector:
                 j += 1
 
             span = (end - start + 1) % num_angles
-            # 最小破裂跨度从6改回4
             if span >= 2:
                 breaks.append([start, end])
 
             i = j
 
-        # ========== 修复：处理跨越0°的破裂区域 ==========
         normalized_breaks = []
         for start, end in breaks:
             if start <= end:
                 normalized_breaks.append((start, end))
             else:
-                # 跨越0°，拆分为两段
                 normalized_breaks.append((start, 359))
                 normalized_breaks.append((0, end))
         return normalized_breaks
 
-    # ========== 性能优化：简化_find_central_region ==========
     def _find_central_region(self, image):
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-        # 使用合适的自适应阈值
         binary_pre = cv2.adaptiveThreshold(gray, 255,
                                            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                            cv2.THRESH_BINARY_INV, 51, 5)
 
-        # 调整开闭运算的结构元素
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        lower_black = np.array([0, 0, 0])
+        upper_black = np.array([180, 255, 90])
+        mask_black = cv2.inRange(hsv, lower_black, upper_black)
+
+        combined_mask = cv2.bitwise_and(binary_pre, mask_black)
+
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
         kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
 
-        stage1 = cv2.morphologyEx(binary_pre, cv2.MORPH_OPEN, kernel_open, iterations=2)
+        stage1 = cv2.morphologyEx(combined_mask, cv2.MORPH_OPEN, kernel_open, iterations=2)
         cleaned_pre = cv2.morphologyEx(stage1, cv2.MORPH_CLOSE, kernel_close)
 
         contours, _ = cv2.findContours(cleaned_pre, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -340,7 +280,7 @@ class PlacidoDetector:
             x, y, w, h = cv2.boundingRect(cnt)
             if w > 0 and h > 0:
                 aspect_ratio = max(w / h, h / w)
-                if aspect_ratio <= 2.0:  # 放宽比例
+                if aspect_ratio <= 2.0:
                     valid_contours.append(cnt)
 
         if valid_contours:
@@ -350,17 +290,18 @@ class PlacidoDetector:
         else:
             roi = gray
 
-        # 调用对比度增强
         enhanced = self._enhance_contrast(roi)
         binary = cv2.threshold(enhanced, self.gray_threshold, 255, cv2.THRESH_BINARY_INV)[1]
         cleaned = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, self.morph_kernel, iterations=2)
         cleaned = cv2.morphologyEx(cleaned, cv2.MORPH_OPEN, self.morph_kernel, iterations=1)
 
+        final_mask = np.zeros_like(gray)
         if valid_contours:
-            final_mask = np.zeros_like(gray)
             final_mask[y:y + h, x:x + w] = cleaned
-            return final_mask
-        return cleaned
+        else:
+            final_mask = cleaned
+
+        return final_mask
 
     def _score_contour(self, cnt, img_center):
         area = cv2.contourArea(cnt)
@@ -376,19 +317,21 @@ class PlacidoDetector:
         cnt_center = np.array([x, y])
         position_score = 1 - (np.linalg.norm(cnt_center - img_center) / np.linalg.norm(img_center))
 
-        aspect_ratio = [cv2.boundingRect(cnt)[2] / cv2.boundingRect(cnt)[3] for cnt in cnt]
-        aspect_score = 1 - abs(np.mean(aspect_ratio) - 1.0)
+        x, y, w, h = cv2.boundingRect(cnt)
+        aspect_ratio = w / h if h != 0 else 1
+        aspect_score = 1 - abs(aspect_ratio - 1.0)
 
-        area_score = area / (img_center[0] * img_center[1])  # 归一化面积评分
+        area_score = area / (img_center[0] * img_center[1])
         return (circularity * 0.5 + aspect_score * 0.3 + position_score * 0.2 + area_score * 0.1)
+
     def generate_terrain_map(self, img1, x_c, y_c):
-        """生成地形图"""
         h, w = img1.shape[:2]
         vis_img = img1.copy()
         roi_radius = self.max_roi
-        mask = np.zeros((h, w), np.uint8)
-        cv2.circle(mask, (x_c, y_c), roi_radius, 255, -1)
-        roi_image = cv2.bitwise_and(img1, vis_img, mask=mask)
+        # 只使用圆形ROI限制，不使用瞳孔mask屏蔽虹膜区域
+        circle_mask = np.zeros((h, w), np.uint8)
+        cv2.circle(circle_mask, (x_c, y_c), roi_radius, 255, -1)
+        roi_image = cv2.bitwise_and(img1, vis_img, mask=circle_mask)
         roi_gray = cv2.cvtColor(roi_image, cv2.COLOR_RGB2GRAY)
         roi_enhanced = self.adaptive_enhancement(roi_gray)
 
@@ -405,7 +348,8 @@ class PlacidoDetector:
             vis_roi = roi_image.copy()
 
         img_f = img1.copy()
-        img_f = np.where(mask[..., None].astype(bool), vis_roi, img_f)
+        img_f = np.where(circle_mask[..., None].astype(bool), vis_roi, img_f)
+
         scale_factor = 1.5
         roi_radius = int(self.max_roi * scale_factor)
         h, w = img_f.shape[:2]
@@ -427,14 +371,11 @@ class PlacidoDetector:
         return cropped_img_f, breaks, distortion
 
     def detect_breaks_combined(self, center, raw_gray_img, enhanced_gray_img):
-        """组合检测环层和破裂 - 优化版：缓存极坐标变换"""
         if center is None:
             return [], [], 0.0
 
-        # ========== 修复1：一次计算极坐标，多处复用 ==========
         polar_cache = {}
         try:
-            # 计算一次极坐标变换，供多个函数使用
             raw_polar = self.polar_transform(raw_gray_img, center)
             if raw_polar is None or raw_polar.size == 0:
                 return [], [], 0.0
@@ -444,14 +385,12 @@ class PlacidoDetector:
             print(f"极坐标变换失败: {e}")
             return [], [], 0.0
 
-        # ========== 修复4：环层检测时过滤过小/过大的环 ==========
         try:
             layers = self.detect_ring_layers(center, raw_gray_img, polar_cache)
-            # 过滤无效环层：半径过小(<13)或过大(>max_roi)
             min_layer_radius = 13
             max_layer_radius = self.max_roi
             layers = [(r_min, r_max) for r_min, r_max in layers
-                     if min_layer_radius <= r_min and r_max <= max_layer_radius]
+                      if min_layer_radius <= r_min and r_max <= max_layer_radius]
         except Exception as e:
             print(f"detect_ring_layers失败: {e}")
             layers = []
@@ -462,7 +401,6 @@ class PlacidoDetector:
             print(f"detect_breaks失败: {e}")
             breaks = []
 
-        # 计算扭曲值
         distortion = 0.0
         try:
             distortion = self.calculate_distortion(enhanced_gray_img, center, layers)
@@ -472,16 +410,13 @@ class PlacidoDetector:
 
         return breaks, layers, distortion
 
-    # ========== 性能优化：简化detect_ring_layers ==========
     def detect_ring_layers(self, center, gray_img, polar_cache=None):
-        """检测环层 - 优化版：减少计算量，添加异常处理和环层过滤"""
         if center is None:
             return []
         if gray_img is None or gray_img.size == 0:
             return []
 
         try:
-            # 优先使用缓存的极坐标，避免重复计算
             if polar_cache is not None and 'raw_polar' in polar_cache:
                 polar = polar_cache['raw_polar']
             else:
@@ -506,7 +441,7 @@ class PlacidoDetector:
             valid_pairs = []
             used_valleys = set()
             for peak in peaks:
-                if peak < 10:  # 过滤半径过小的环
+                if peak < 10:
                     continue
                 candidate_valleys = [v for v in valleys if v > peak and v not in used_valleys]
                 if candidate_valleys:
@@ -516,8 +451,6 @@ class PlacidoDetector:
                         used_valleys.add(closest_valley)
 
             filtered_layers = valid_pairs
-
-            # 环层过滤
             min_layer_radius = 13
             max_layer_radius = self.max_roi if self.max_roi > 0 else 300
             filtered_layers = [(r_min, r_max) for r_min, r_max in filtered_layers
@@ -529,16 +462,10 @@ class PlacidoDetector:
             print(f"detect_ring_layers异常: {e}")
             return []
 
-    # ========== 优化后的detect_breaks：多特征融合 + 性能优化 ==========
+    # ========== 恢复正常检测：移除瞳孔mask限制，只保留图像边界判断 ==========
     def detect_breaks(self, roi, center, layers):
-        """检测破裂 - 添加异常处理"""
         try:
-            if center is None:
-                return []
-            if roi is None or roi.size == 0:
-                return []
-            if not layers:
-                print("警告：无有效环层，跳过破损检测")
+            if center is None or roi is None or roi.size == 0 or not layers:
                 return []
         except Exception as e:
             print(f"detect_breaks参数检查异常: {e}")
@@ -549,12 +476,7 @@ class PlacidoDetector:
         angle_step = self.angle_step
 
         standard_widths = [r_max - r_min for r_min, r_max in layers]
-        if not standard_widths:
-            print("警告：无有效环层宽度，跳过破损检测")
-            return []
-        # ========== 修复：环层数量不足时直接返回 ==========
         if len(standard_widths) < 2:
-            print("警告：环层数量不足2，无法检测破裂")
             return []
 
         standard_width00 = [standard_widths[0] * 0.25, standard_widths[0] * 3.8, standard_widths[0] * 0.3]
@@ -562,7 +484,6 @@ class PlacidoDetector:
         every_width = {}
         finish_counts = {}
 
-        # 三角函数缓存
         cos_sin_cache = {ad: (np.cos(np.deg2rad(ad)), np.sin(np.deg2rad(ad)))
                         for ad in range(0, num_angles, angle_step)}
 
@@ -571,14 +492,14 @@ class PlacidoDetector:
             profile_r = []
             profile_intensity = []
             r_step = 2
+
             for r in range(0, max_radius, r_step):
                 x = int(center[0] + r * cos_a)
                 y = int(center[1] + r * sin_a)
+                # 只判断是否在图像内，不判断瞳孔mask
                 if 0 <= x < roi.shape[1] and 0 <= y < roi.shape[0]:
                     profile_r.append(r)
                     profile_intensity.append(roi[y, x])
-                else:
-                    break
 
             if len(profile_intensity) < 5:
                 every_width[angle_deg] = []
@@ -655,7 +576,6 @@ class PlacidoDetector:
             every_width[angle_deg] = [tuple(b) for b in merged_bands]
             finish_counts[angle_deg] = len(merged_bands)
 
-        # ========== 多特征融合：加权投票机制判断破裂 ==========
         breaks = []
         roi_h, roi_w = roi.shape
 
@@ -667,22 +587,15 @@ class PlacidoDetector:
                 num_detected_bands = finish_counts.get(angle, 0)
 
                 if layer_idx >= num_detected_bands or not band_list:
-                    # ========== 修复：默认分数改为1.0（表示正常） ==========
                     angle_scores.append((angle, 1.0))
                     continue
 
                 r_start, r_end = band_list[layer_idx]
                 standard = standard_widths[layer_idx]
 
-                # 1. 宽度特征
                 width_score = self._calculate_width_feature(r_start, r_end, standard)
+                gray_score = self._calculate_gray_uniformity_feature(roi, center, angle, r_start, r_end)
 
-                # 2. 灰度均匀度特征
-                gray_score = self._calculate_gray_uniformity_feature(
-                    roi, center, angle, r_start, r_end
-                )
-
-                # 3. 边缘连续性特征 - 恢复宽松的判定区间
                 actual_width = r_end - r_start
                 width_ratio = actual_width / standard if standard > 0 else 1
                 if 0.55 <= width_ratio <= 1.45:
@@ -692,22 +605,18 @@ class PlacidoDetector:
                 else:
                     edge_score = 0.4
 
-                # 加权融合
                 fused_score = self._fused_break_score(width_score, gray_score, edge_score)
                 angle_scores.append((angle, fused_score))
 
             break_ranges = self._vote_break_judgment(angle_scores)
-
             if break_ranges:
                 breaks.append((layer_idx, break_ranges))
 
         print("breaks", breaks)
         return breaks
 
-    # ========== 性能优化：简化polar_transform ==========
     def polar_transform(self, img, center, output_size=None):
-        """极坐标变换 - 优化版：减少输出分辨率"""
-        max_radius = self.max_roi  # 修复：使用 self.max_roi 而非 +50，保持一致
+        max_radius = self.max_roi
         if output_size is None:
             output_size = (int(max_radius), 360)
         flags = cv2.INTER_LINEAR + cv2.WARP_POLAR_LINEAR
@@ -716,7 +625,6 @@ class PlacidoDetector:
         return polar_img
 
     def _get_contour_center(self, contour):
-        """获取轮廓中心"""
         M = cv2.moments(contour)
         if M["m00"] > 0:
             return (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
@@ -725,16 +633,15 @@ class PlacidoDetector:
             return (int(x), int(y))
 
     def detect(self, image_input):
-        """主检测函数"""
         start = timer.time()
         if isinstance(image_input, str):
             image = cv2_imread_chinese(image_input)
             if image is None:
-                return None, "无法读取图像（路径含中文/文件不存在/文件损坏）", None, False
+                return None, "无法读取图像（路径含中文/文件不存在/文件损坏）", None, False, 0.0
         elif isinstance(image_input, np.ndarray):
             image = image_input.copy()
         else:
-            return None, "无效的输入类型", None, False
+            return None, "无效的输入类型", None, False, 0.0
 
         h, w = image.shape[:2]
         self.max_roi = min(int(min(h, w) / 5), 400)
@@ -751,6 +658,8 @@ class PlacidoDetector:
         center = None
         terrain_map = vis_img
         has_break = False
+        distortion = 0.0
+
         if len(contours) == 0:
             print("警告：未检出眼部轮廓")
         else:
@@ -772,8 +681,6 @@ class PlacidoDetector:
                 terrain_map = vis_img
                 has_break = False
                 distortion = 0.0
-        else:
-            distortion = 0.0
 
         print("检测时间", timer.time() - start)
         print(f"扭曲值: {distortion:.4f}")
