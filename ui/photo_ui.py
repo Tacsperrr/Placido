@@ -104,6 +104,7 @@ class Ui_Form(object):
         self.buttonLayout.setSpacing(30)
         self.buttonLayout.setObjectName("buttonLayout")
 
+        # 第一个按钮：选择图片
         self.pushButton = QtWidgets.QPushButton(self.buttonFrame)
         self.pushButton.setMinimumSize(QtCore.QSize(140, 45))
         self.pushButton.setStyleSheet(
@@ -113,6 +114,7 @@ class Ui_Form(object):
         self.pushButton.setObjectName("pushButton")
         self.buttonLayout.addWidget(self.pushButton)
 
+        # 第二个按钮：开始检测
         self.pushButton_2 = QtWidgets.QPushButton(self.buttonFrame)
         self.pushButton_2.setMinimumSize(QtCore.QSize(140, 45))
         self.pushButton_2.setStyleSheet(
@@ -122,8 +124,20 @@ class Ui_Form(object):
         self.pushButton_2.setObjectName("pushButton_2")
         self.buttonLayout.addWidget(self.pushButton_2)
 
+        # 第三个按钮：开始检测2（新添加的按钮，与开始检测按钮样式相同）
+        self.pushButton_4 = QtWidgets.QPushButton(self.buttonFrame)
+        self.pushButton_4.setMinimumSize(QtCore.QSize(140, 45))
+        self.pushButton_4.setStyleSheet(
+            "QPushButton { background: #27ae60; color: white; border: none;"
+            "    border-radius: 22px; font-size: 14px; font-weight: bold; }"
+            "QPushButton:hover { background: #1e8449; }")
+        self.pushButton_4.setObjectName("pushButton_4")
+        self.buttonLayout.addWidget(self.pushButton_4)
+
+        # 添加弹簧（弹性空间）
         self.buttonLayout.addStretch(1)
 
+        # 第四个按钮：返回
         self.pushButton_3 = QtWidgets.QPushButton(self.buttonFrame)
         self.pushButton_3.setMinimumSize(QtCore.QSize(100, 45))
         self.pushButton_3.setStyleSheet(
@@ -146,4 +160,5 @@ class Ui_Form(object):
         self.labelTitle2.setText(_translate("Form", "检测结果"))
         self.pushButton.setText(_translate("Form", "选择图片"))
         self.pushButton_2.setText(_translate("Form", "开始检测"))
+        self.pushButton_4.setText(_translate("Form", "开始检测2"))  # 新按钮的文本
         self.pushButton_3.setText(_translate("Form", "返回"))

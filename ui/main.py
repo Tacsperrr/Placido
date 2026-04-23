@@ -26,6 +26,7 @@ import video_ui
 import src.csy_rc
 import detect
 import video_detector
+import detect2
 
 
 def load_stylesheet():
@@ -71,6 +72,7 @@ class UI_photo(QMainWindow):
         self.ui.pushButton.clicked.connect(self.openimage)
         self.ui.pushButton_2.clicked.connect(self.detect)
         self.ui.pushButton_3.clicked.connect(self.exit)
+        self.ui.pushButton_4.clicked.connect(self.detect2)
         self.show()
 
     def go_to_photo(self):
@@ -156,6 +158,52 @@ class UI_photo(QMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "错误", f"检测失败: {str(e)}")
+            print(traceback.format_exc())
+
+    def detect2(self):
+        """新检测方法 - 使用 detect2.py 中的 PlacidoDetector"""
+        try:
+            if not self.img_path:
+                QMessageBox.warning(self, "警告", "请先选择图片!")
+                return
+
+            img = self.cv2_imread_chinese(self.img_path)
+            if img is None:
+                QMessageBox.critical(self, "文件读取错误", f"无法读取图片：{self.img_path}")
+                return
+
+            # 使用新创建的 detect2 模块
+            detector2 = detect2.PlacidoDetector()
+            center, terrain_map, mask = detector2.detect(self.img_path)
+
+            # 注意：detect2 中的 detect 方法返回的是 (center, terrain_map, mask)
+            # 没有 has_break 和 distortion，所以需要特殊处理
+
+            if center is None:
+                QMessageBox.warning(self, "警告", "未检测到圆环，请输入有效眼部图像!")
+                # 显示原始图像
+                vis_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            else:
+                # terrain_map 已经是 RGB 格式的可视化结果
+                vis_rgb = terrain_map
+                QMessageBox.information(self, "检测结果", "检测完成！(使用detect2)")
+
+            # 显示结果图像
+            if vis_rgb is not None and len(vis_rgb.shape) == 3:
+                height, width, channel = vis_rgb.shape
+                bytes_per_line = 3 * width
+                q_img = QImage(vis_rgb.tobytes(), width, height, bytes_per_line, QImage.Format_RGB888)
+                pixmap = QPixmap.fromImage(q_img)
+                scaled_pixmap = pixmap.scaled(
+                    self.ui.label_2.width(),
+                    self.ui.label_2.height(),
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
+                self.ui.label_2.setPixmap(scaled_pixmap)
+
+        except Exception as e:
+            QMessageBox.critical(self, "错误", f"detect2检测失败: {str(e)}")
             print(traceback.format_exc())
 
 
